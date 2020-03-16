@@ -63,6 +63,9 @@ type UserService interface {
 	DeleteUser(ctx context.Context, id ID) error
 }
 
+// UserMiddleware is a service middleware func.
+type UserMiddleware func(UserService) UserService
+
 // UserUpdate represents updates to a user.
 // Only fields which are set are updated.
 type UserUpdate struct {

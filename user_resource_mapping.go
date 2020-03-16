@@ -100,6 +100,9 @@ type UserResourceMappingService interface {
 	DeleteUserResourceMapping(ctx context.Context, resourceID, userID ID) error
 }
 
+// UserResourceMappingMiddleware is a service middleware func.
+type UserResourceMappingMiddleware func(UserResourceMappingService) UserResourceMappingService
+
 // UserResourceMapping represents a mapping of a resource to its user.
 type UserResourceMapping struct {
 	UserID       ID           `json:"userID"`

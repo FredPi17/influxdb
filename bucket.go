@@ -98,6 +98,9 @@ type BucketService interface {
 	FindBucketByName(ctx context.Context, orgID ID, name string) (*Bucket, error)
 }
 
+// BucketMiddleware is a service middleware func.
+type BucketMiddleware func(BucketService) BucketService
+
 // BucketUpdate represents updates to a bucket.
 // Only fields which are set are updated.
 type BucketUpdate struct {

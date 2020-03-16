@@ -50,6 +50,7 @@ import (
 	"github.com/influxdata/influxdb/task/backend/middleware"
 	"github.com/influxdata/influxdb/task/backend/scheduler"
 	"github.com/influxdata/influxdb/telemetry"
+	"github.com/influxdata/influxdb/tenant"
 	_ "github.com/influxdata/influxdb/tsdb/tsi1" // needed for tsi1
 	_ "github.com/influxdata/influxdb/tsdb/tsm1" // needed for tsm1
 	"github.com/influxdata/influxdb/vault"
@@ -516,11 +517,11 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 	m.reg.MustRegister(m.boltClient)
 
 	var (
-		orgSvc                    platform.OrganizationService             = m.kvService
+		orgSvc                    platform.OrganizationService             = tenant.NewOrgMetrics(m.reg)(m.kvService)
 		authSvc                   platform.AuthorizationService            = m.kvService
-		userSvc                   platform.UserService                     = m.kvService
+		userSvc                   platform.UserService                     = tenant.NewUserMetrics(m.reg)(m.kvService)
 		variableSvc               platform.VariableService                 = m.kvService
-		bucketSvc                 platform.BucketService                   = m.kvService
+		bucketSvc                 platform.BucketService                   = tenant.NewBucketMetrics(m.reg)(m.kvService)
 		sourceSvc                 platform.SourceService                   = m.kvService
 		sessionSvc                platform.SessionService                  = m.kvService
 		passwdsSvc                platform.PasswordsService                = m.kvService
@@ -532,7 +533,7 @@ func (m *Launcher) run(ctx context.Context) (err error) {
 		onboardingSvc             platform.OnboardingService               = m.kvService
 		scraperTargetSvc          platform.ScraperTargetStoreService       = m.kvService
 		telegrafSvc               platform.TelegrafConfigStore             = m.kvService
-		userResourceSvc           platform.UserResourceMappingService      = m.kvService
+		userResourceSvc           platform.UserResourceMappingService      = tenant.NewUrmMetrics(m.reg)(m.kvService)
 		labelSvc                  platform.LabelService                    = m.kvService
 		secretSvc                 platform.SecretService                   = m.kvService
 		lookupSvc                 platform.LookupService                   = m.kvService

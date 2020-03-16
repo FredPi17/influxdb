@@ -56,6 +56,9 @@ type OrganizationService interface {
 	DeleteOrganization(ctx context.Context, id ID) error
 }
 
+// OrgMiddleware is a service middleware func.
+type OrgMiddleware func(OrganizationService) OrganizationService
+
 // OrganizationUpdate represents updates to a organization.
 // Only fields which are set are updated.
 type OrganizationUpdate struct {
