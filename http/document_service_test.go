@@ -648,10 +648,16 @@ func AddLabels(t *testing.T) {
 
 	t.Run("add same twice", func(t *testing.T) {
 		// TODO(affo)
-		t.Skip("see https://github.com/influxdata/influxdb/issues/17092")
+		// t.Skip("see https://github.com/influxdata/influxdb/issues/17092")
 
 		serverFn, clientFn, fx := setup(t)
-		server := serverFn(fx.auth(influxdb.WriteAction))
+		server := serverFn(func() influxdb.Authorizer {
+			a := fx.auth(influxdb.WriteAction)
+			// The LabelService uses a "standard auth" mode.
+			// That's  why we need to add further permissions and the org ones are not enough.
+			fx.addLabelPermission(a, influxdb.WriteAction, fx.Labels[0].ID)
+			return a
+		}())
 		defer server.Close()
 		client := clientFn(server.URL)
 		if _, err := client.AddDocumentLabel(context.Background(), namespace, fx.Document.ID, fx.Labels[0].ID); err != nil {
