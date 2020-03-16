@@ -110,7 +110,7 @@ func (s *ScraperTargetStoreService) AddTarget(ctx context.Context, st *influxdb.
 		return err
 	}
 
-	if err := authorizeWriteBucket(ctx, st.OrgID, st.BucketID); err != nil {
+	if err := AuthorizeWrite(ctx, influxdb.BucketsResourceType, st.BucketID, st.OrgID); err != nil {
 		return err
 	}
 
@@ -128,7 +128,7 @@ func (s *ScraperTargetStoreService) UpdateTarget(ctx context.Context, upd *influ
 		return nil, err
 	}
 
-	if err := authorizeWriteBucket(ctx, st.OrgID, st.BucketID); err != nil {
+	if err := AuthorizeWrite(ctx, influxdb.BucketsResourceType, st.BucketID, st.OrgID); err != nil {
 		return nil, err
 	}
 

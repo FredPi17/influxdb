@@ -2,10 +2,6 @@ package authorizer
 
 import (
 	"context"
-	"fmt"
-
-	icontext "github.com/influxdata/influxdb/context"
-
 	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/kit/tracing"
 )
@@ -27,23 +23,6 @@ func NewBucketService(s influxdb.BucketService, u influxdb.UserResourceMappingSe
 	}
 }
 
-func newBucketPermission(a influxdb.Action, orgID, id influxdb.ID) (*influxdb.Permission, error) {
-	return influxdb.NewPermissionAtID(id, a, influxdb.BucketsResourceType, orgID)
-}
-
-func authorizeWriteBucket(ctx context.Context, orgID, id influxdb.ID) error {
-	p, err := newBucketPermission(influxdb.WriteAction, orgID, id)
-	if err != nil {
-		return err
-	}
-
-	if err := IsAllowed(ctx, *p); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func authorizeReadBucket(ctx context.Context, b *influxdb.Bucket, u influxdb.UserResourceMappingService) error {
 	switch b.Type {
 	case influxdb.BucketTypeSystem:
@@ -54,19 +33,7 @@ func authorizeReadBucket(ctx context.Context, b *influxdb.Bucket, u influxdb.Use
 }
 
 func authorizeReadUserBucket(ctx context.Context, b *influxdb.Bucket) error {
-	span, ctx := tracing.StartSpanFromContext(ctx)
-	defer span.Finish()
-
-	p, err := newBucketPermission(influxdb.ReadAction, b.OrgID, b.ID)
-	if err != nil {
-		return err
-	}
-
-	if err := IsAllowed(ctx, *p); err != nil {
-		return err
-	}
-
-	return nil
+	return AuthorizeRead(ctx, influxdb.BucketsResourceType, b.ID, b.OrgID)
 }
 
 func authorizeReadSystemBucket(ctx context.Context, b *influxdb.Bucket, u influxdb.UserResourceMappingService) error {
@@ -74,34 +41,7 @@ func authorizeReadSystemBucket(ctx context.Context, b *influxdb.Bucket, u influx
 	if !b.OrgID.Valid() && (b.ID == influxdb.TasksSystemBucketID || b.ID == influxdb.MonitoringSystemBucketID) {
 		return nil
 	}
-
-	userID, err := icontext.GetUserID(ctx)
-	if err != nil {
-		return &influxdb.Error{
-			Code: influxdb.EUnauthorized,
-			Msg:  fmt.Sprintf("unauthorized"),
-			Err:  err,
-		}
-	}
-
-	ms, _, err := u.FindUserResourceMappings(ctx, influxdb.UserResourceMappingFilter{
-		UserID:       userID,
-		ResourceType: influxdb.OrgsResourceType,
-	})
-	if err != nil {
-		return fmt.Errorf("finding organization mapping for user %s: %v", b.ID, err)
-	}
-
-	for _, m := range ms {
-		if m.ResourceID == b.OrgID {
-			return nil
-		}
-	}
-
-	return &influxdb.Error{
-		Code: influxdb.EUnauthorized,
-		Msg:  "unauthorized",
-	}
+	return AuthorizeReadOrg(ctx, b.OrgID)
 }
 
 // FindBucketByID checks to see if the authorizer on context has read access to the id provided.
@@ -166,24 +106,7 @@ func (s *BucketService) FindBuckets(ctx context.Context, filter influxdb.BucketF
 	if err != nil {
 		return nil, 0, err
 	}
-
-	// This filters without allocating
-	// https://github.com/golang/go/wiki/SliceTricks#filtering-without-allocating
-	buckets := bs[:0]
-	for _, b := range bs {
-		err := authorizeReadBucket(ctx, b, s.u)
-		if err != nil && influxdb.ErrorCode(err) != influxdb.EUnauthorized {
-			return nil, 0, err
-		}
-
-		if influxdb.ErrorCode(err) == influxdb.EUnauthorized {
-			continue
-		}
-
-		buckets = append(buckets, b)
-	}
-
-	return buckets, len(buckets), nil
+	return authorizeFindBuckets(ctx, bs)
 }
 
 // CreateBucket checks to see if the authorizer on context has write access to the global buckets resource.
@@ -191,15 +114,9 @@ func (s *BucketService) CreateBucket(ctx context.Context, b *influxdb.Bucket) er
 	span, ctx := tracing.StartSpanFromContext(ctx)
 	defer span.Finish()
 
-	p, err := influxdb.NewPermission(influxdb.WriteAction, influxdb.BucketsResourceType, b.OrgID)
-	if err != nil {
+	if err := AuthorizeCreate(ctx, influxdb.BucketsResourceType, b.OrgID); err != nil {
 		return err
 	}
-
-	if err := IsAllowed(ctx, *p); err != nil {
-		return err
-	}
-
 	return s.s.CreateBucket(ctx, b)
 }
 
@@ -209,11 +126,9 @@ func (s *BucketService) UpdateBucket(ctx context.Context, id influxdb.ID, upd in
 	if err != nil {
 		return nil, err
 	}
-
-	if err := authorizeWriteBucket(ctx, b.OrgID, id); err != nil {
+	if err := AuthorizeWrite(ctx, influxdb.BucketsResourceType, id, b.OrgID); err != nil {
 		return nil, err
 	}
-
 	return s.s.UpdateBucket(ctx, id, upd)
 }
 
@@ -223,10 +138,8 @@ func (s *BucketService) DeleteBucket(ctx context.Context, id influxdb.ID) error 
 	if err != nil {
 		return err
 	}
-
-	if err := authorizeWriteBucket(ctx, b.OrgID, id); err != nil {
+	if err := AuthorizeWrite(ctx, influxdb.BucketsResourceType, id, b.OrgID); err != nil {
 		return err
 	}
-
 	return s.s.DeleteBucket(ctx, id)
 }
